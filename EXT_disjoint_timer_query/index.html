@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>EXT_disjoint_timer_query Test</title>
+</head>
+<body>
+    <h1>EXT_disjoint_timer_query Test</h1>
+    <p id="result">Checking...</p>
+    <canvas id="canvas" width="1" height="1"></canvas>
+    <script>
+        function checkExtension() {
+            var canvas = document.getElementById('canvas');
+            var gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+            
+            if (!gl) {
+                document.getElementById('result').innerText = "WebGL not supported";
+                return;
+            }
+
+            var ext = gl.getExtension('EXT_disjoint_timer_query');
+            
+            if (ext) {
+                document.getElementById('result').innerText = "EXT_disjoint_timer_query is AVAILABLE";
+                document.getElementById('result').style.color = "green";
+            } else {
+                document.getElementById('result').innerText = "EXT_disjoint_timer_query is NOT available";
+                document.getElementById('result').style.color = "red";
+            }
+        }
+        checkExtension();
+    </script>
+</body>
+</html>
