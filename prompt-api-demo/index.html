@@ -1,0 +1,1166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Prompt API Demo · On-device AI in Microsoft Edge</title>
+<style>
+  :root {
+    --bg: #f3f5f7;
+    --surface: #ffffff;
+    --surface-subtle: #f8fafb;
+    --surface-strong: #eef2f5;
+    --ink: #171b20;
+    --text: #242a31;
+    --muted: #66717d;
+    --faint: #9aa4ae;
+    --stroke: #d9e0e7;
+    --stroke-strong: #bdc8d3;
+    --accent: #1f6feb;
+    --accent-dark: #174ea6;
+    --accent-soft: #e8f1ff;
+    --ok: #16794c;
+    --ok-soft: #e7f5ee;
+    --warn: #9a6700;
+    --warn-soft: #fff6df;
+    --err: #c93c37;
+    --err-soft: #fff0ef;
+    --shadow: 0 12px 34px rgba(34, 43, 54, 0.10);
+    --shadow-soft: 0 4px 14px rgba(34, 43, 54, 0.08);
+    --mono: "SFMono-Regular", "JetBrains Mono", "Cascadia Code", Consolas, monospace;
+    --sans: "Segoe UI", system-ui, -apple-system, sans-serif;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+
+  body {
+    margin: 0;
+    font-family: var(--sans);
+    color: var(--text);
+    background: var(--bg);
+    height: 100vh;
+    height: 100dvh;
+    overflow: hidden;
+    line-height: 1.5;
+  }
+
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  .wrap {
+    max-width: 1240px;
+    height: 100vh;
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    margin: 0 auto;
+    padding: 18px clamp(16px, 4vw, 36px) 16px;
+  }
+
+  header.top {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+    flex: none;
+  }
+
+  .logo {
+    width: 42px;
+    height: 42px;
+    border-radius: 8px;
+    background: var(--ink);
+    display: grid;
+    place-items: center;
+    box-shadow: var(--shadow-soft);
+    flex: none;
+  }
+
+  .logo svg { width: 22px; height: 22px; }
+
+  .title-block h1 {
+    margin: 0;
+    font-size: 22px;
+    letter-spacing: 0;
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  .title-block p { margin: 2px 0 0; color: var(--muted); font-size: 13px; }
+
+  .status-pill {
+    margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
+    padding: 8px 13px;
+    border-radius: 999px;
+    background: var(--surface);
+    border: 1px solid var(--stroke);
+    box-shadow: var(--shadow-soft);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ink);
+  }
+
+  .dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: var(--faint);
+    transition: background .3s;
+  }
+
+  .dot.live { background: var(--ok); animation: pulse 1.8s infinite; }
+  .dot.warn { background: var(--warn); animation: pulse 1.8s infinite; }
+  .dot.err  { background: var(--err); }
+  .dot.busy { background: var(--accent); animation: pulse 1s infinite; }
+
+  @keyframes pulse {
+    0%   { box-shadow: 0 0 0 0 rgba(31, 111, 235, 0.22); }
+    70%  { box-shadow: 0 0 0 8px rgba(31, 111, 235, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(31, 111, 235, 0); }
+  }
+
+  .gate { flex: none; }
+  .footer { flex: none; }
+
+  .grid {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: grid;
+    grid-template-columns: 350px minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+    gap: 16px;
+    align-items: stretch;
+  }
+
+  .grid > div { min-height: 0; }
+  .grid > div:first-child {
+    overflow-y: auto;
+    padding-right: 2px;
+    scrollbar-width: thin;
+  }
+
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--stroke);
+    border-radius: 8px;
+    box-shadow: var(--shadow-soft);
+    overflow: hidden;
+    position: relative;
+  }
+
+  .panel + .panel { margin-top: 14px; }
+
+  .panel-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+    background: var(--surface-subtle);
+    border-bottom: 1px solid var(--stroke);
+  }
+
+  .panel-head .ico {
+    width: 28px;
+    height: 28px;
+    border-radius: 7px;
+    color: var(--accent);
+    background: var(--accent-soft);
+    display: grid;
+    place-items: center;
+    flex: none;
+  }
+
+  .panel-head h2 {
+    margin: 0;
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0;
+    color: var(--muted);
+  }
+
+  .panel-body { padding: 16px; }
+
+  .kv { display: flex; flex-direction: column; gap: 0; }
+  .kv-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    min-height: 38px;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--stroke);
+    font-size: 13px;
+  }
+
+  .kv-row:first-child { padding-top: 0; }
+  .kv-row:last-child { border-bottom: none; padding-bottom: 0; }
+  .kv-row .k { color: var(--muted); }
+  .kv-row .v {
+    font-family: var(--mono);
+    font-size: 12.5px;
+    color: var(--text);
+    text-align: right;
+  }
+
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 9px;
+    border-radius: 999px;
+    font-size: 11.5px;
+    font-weight: 700;
+    letter-spacing: 0;
+    font-family: var(--sans);
+    border: 1px solid transparent;
+  }
+
+  .badge.gray { color: var(--muted); background: var(--surface-strong); border-color: var(--stroke); }
+  .badge.green { color: var(--ok); background: var(--ok-soft); border-color: #b9dfca; }
+  .badge.amber { color: var(--warn); background: var(--warn-soft); border-color: #ead18a; }
+  .badge.red { color: var(--err); background: var(--err-soft); border-color: #efc0bd; }
+  .badge.blue { color: var(--accent-dark); background: var(--accent-soft); border-color: #b9d2ff; }
+
+  .download-card {
+    margin-top: 16px;
+    padding: 14px;
+    border: 1px solid #b9d2ff;
+    border-radius: 8px;
+    background: var(--accent-soft);
+    display: none;
+  }
+
+  .download-card.show { display: block; }
+
+  .download-card .dl-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 12px;
+    font-size: 12.5px;
+    margin-bottom: 10px;
+  }
+
+  .download-card .dl-top b { font-weight: 600; }
+  .download-card .dl-pct { font-family: var(--mono); color: var(--accent-dark); font-size: 13px; }
+
+  .bar {
+    height: 9px;
+    border-radius: 999px;
+    overflow: hidden;
+    background: #d3e3fb;
+    position: relative;
+  }
+
+  .bar > span {
+    display: block;
+    height: 100%;
+    width: 0%;
+    border-radius: 999px;
+    background: var(--accent);
+    transition: width .25s ease;
+  }
+
+  .bar.indeterminate > span {
+    width: 35% !important;
+    animation: slide 1.3s ease-in-out infinite;
+  }
+
+  @keyframes slide {
+    0% { margin-left: -35%; }
+    100% { margin-left: 100%; }
+  }
+
+  .dl-sub { margin-top: 8px; font-size: 11.5px; color: var(--faint); font-family: var(--mono); }
+
+  .log {
+    font-family: var(--mono);
+    font-size: 11px;
+    line-height: 1.65;
+    background: #111820;
+    border: 1px solid var(--stroke);
+    border-radius: 8px;
+    padding: 11px 12px;
+    height: clamp(140px, 22vh, 210px);
+    overflow-y: auto;
+    color: #b7c2cf;
+  }
+
+  .log::-webkit-scrollbar { width: 8px; }
+  .log::-webkit-scrollbar-thumb { background: #46515d; border-radius: 8px; }
+
+  .log-line {
+    display: flex;
+    gap: 9px;
+    padding: 1px 0;
+    animation: fadein .2s ease;
+  }
+
+  @keyframes fadein {
+    from { opacity: 0; transform: translateY(2px); }
+    to { opacity: 1; transform: none; }
+  }
+
+  .log-line .ts { color: #6f7b87; flex: none; }
+  .log-line .msg { word-break: break-word; }
+  .log-line.info .msg { color: #d7dee6; }
+  .log-line.sys .msg  { color: #8db9ff; }
+  .log-line.evt .msg  { color: #70d1ad; }
+  .log-line.ok .msg   { color: #8ee3b1; }
+  .log-line.warn .msg { color: #f4cb73; }
+  .log-line.err .msg  { color: #ff9a95; }
+  .log-line .msg b { color: inherit; font-weight: 700; }
+
+  .field { margin-bottom: 12px; }
+  .field:last-child { margin-bottom: 0; }
+
+  .field label {
+    display: block;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--muted);
+    margin-bottom: 6px;
+    letter-spacing: 0;
+  }
+
+  textarea, input[type=text] {
+    width: 100%;
+    resize: vertical;
+    background: #ffffff;
+    border: 1px solid var(--stroke-strong);
+    border-radius: 8px;
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 13.5px;
+    padding: 10px 12px;
+    line-height: 1.45;
+    transition: border-color .15s, box-shadow .15s;
+  }
+
+  textarea:focus, input:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(31, 111, 235, 0.14);
+  }
+
+  textarea { min-height: 52px; }
+
+  .sliders { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .slider-head {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 7px;
+  }
+
+  .slider-head .val { font-family: var(--mono); color: var(--accent-dark); font-weight: 700; }
+
+  input[type=range] {
+    width: 100%;
+    -webkit-appearance: none;
+    appearance: none;
+    height: 5px;
+    border-radius: 999px;
+    background: var(--surface-strong);
+    outline: none;
+  }
+
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--accent);
+    border: 2px solid #fff;
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(31, 111, 235, 0.35);
+    transition: transform .15s, box-shadow .15s;
+  }
+
+  .row-actions { display: flex; gap: 10px; align-items: center; margin-top: 6px; }
+
+  button.btn {
+    font-family: var(--sans);
+    font-size: 13.5px;
+    font-weight: 700;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    cursor: pointer;
+    padding: 10px 16px;
+    color: #fff;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    justify-content: center;
+    transition: transform .12s, box-shadow .12s, opacity .12s, background .15s, filter .15s;
+  }
+
+  button.btn:active { transform: translateY(1px) scale(.99); }
+  button.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+  .btn-sm { padding: 7px 11px; font-size: 12px; border-radius: 7px; }
+  .send-ico { transition: transform .2s ease; }
+  .btn-primary:hover:not(:disabled) .send-ico { transform: translateX(2px) rotate(6deg); }
+
+  .btn-primary {
+    background: var(--accent);
+    border-color: var(--accent);
+    box-shadow: 0 8px 18px rgba(31, 111, 235, 0.22);
+  }
+
+  .btn-primary:hover:not(:disabled) {
+    background: var(--accent-dark);
+    border-color: var(--accent-dark);
+    box-shadow: 0 10px 24px rgba(31, 111, 235, 0.28);
+  }
+
+  .btn-ghost {
+    background: #ffffff;
+    border: 1px solid var(--stroke-strong);
+    color: var(--text);
+  }
+
+  .btn-ghost:hover:not(:disabled) {
+    background: var(--surface-strong);
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  .btn-danger {
+    background: var(--err-soft);
+    border: 1px solid #efc0bd;
+    color: var(--err);
+  }
+
+  .btn-danger:hover:not(:disabled) { background: #ffe5e3; }
+  .spacer { flex: 1; }
+
+  .grid > div:last-child { display: flex; flex-direction: column; min-height: 0; }
+  .grid > div:last-child > .panel { flex: 1 1 auto; min-height: 0; }
+  .conversation { display: flex; flex-direction: column; min-height: 0; }
+  .conversation .panel-body { flex: 1 1 auto; display: flex; flex-direction: column; min-height: 0; }
+
+  .composer {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--stroke);
+    flex: none;
+  }
+
+  .composer textarea {
+    width: 100%;
+    resize: none;
+    min-height: 64px;
+    background: #ffffff;
+    border: 1px solid var(--stroke-strong);
+    border-radius: 8px;
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 14px;
+    padding: 12px 14px;
+    line-height: 1.5;
+    transition: border-color .15s, box-shadow .15s, background .15s;
+  }
+
+  .composer textarea:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 4px rgba(31, 111, 235, 0.12);
+  }
+
+  .composer-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 10px;
+    min-width: 0;
+  }
+
+  .composer-actions .btn { flex: none; }
+
+  .composer-hint {
+    font-size: 11.5px;
+    color: var(--faint);
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .composer-hint code { font-family: var(--mono); font-size: 11px; color: var(--accent); }
+
+  .thread {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: scroll;
+    padding: 4px 10px 4px 2px;
+    scrollbar-gutter: stable;
+    scrollbar-width: thin;
+    scrollbar-color: var(--stroke-strong) var(--surface-subtle);
+  }
+
+  .thread::-webkit-scrollbar { width: 12px; }
+
+  .thread::-webkit-scrollbar-track {
+    background: var(--surface-subtle);
+    border-radius: 10px;
+    margin: 2px 0;
+  }
+
+  .thread::-webkit-scrollbar-thumb {
+    background: var(--stroke-strong);
+    border-radius: 10px;
+    border: 3px solid var(--surface-subtle);
+    min-height: 36px;
+  }
+
+  .thread::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+  .thread:has(.empty-state) { justify-content: center; }
+
+  .empty-state {
+    text-align: center;
+    color: var(--faint);
+    padding: 42px 20px;
+    font-size: 13.5px;
+  }
+
+  .empty-state svg { width: 40px; height: 40px; opacity: .5; margin-bottom: 12px; }
+
+  .msg-row {
+    display: flex;
+    gap: 11px;
+    align-items: flex-start;
+    animation: fadein .25s ease;
+  }
+
+  .msg-row.user { flex-direction: row-reverse; }
+
+  .avatar {
+    width: 30px;
+    height: 30px;
+    border-radius: 7px;
+    flex: none;
+    display: grid;
+    place-items: center;
+    font-size: 13px;
+    font-weight: 700;
+  }
+
+  .avatar.ai { background: var(--ink); color: #ffffff; }
+  .avatar.me { background: var(--surface-strong); border: 1px solid var(--stroke-strong); color: var(--text); }
+
+  .bubble {
+    max-width: 80%;
+    padding: 11px 14px;
+    border-radius: 8px;
+    font-size: 14px;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  .bubble.ai {
+    background: var(--surface-subtle);
+    border: 1px solid var(--stroke);
+    border-top-left-radius: 3px;
+    box-shadow: var(--shadow-soft);
+  }
+
+  .bubble.me {
+    background: var(--accent);
+    color: #fff;
+    border-top-right-radius: 3px;
+    box-shadow: 0 8px 20px rgba(31, 111, 235, 0.20);
+  }
+
+  .bubble .cursor {
+    display: inline-block;
+    width: 7px;
+    height: 15px;
+    background: var(--accent);
+    margin-left: 1px;
+    border-radius: 1px;
+    animation: blink 1s steps(2) infinite;
+    vertical-align: text-bottom;
+  }
+
+  @keyframes blink { 0%,50%{opacity:1;} 51%,100%{opacity:0;} }
+
+  .bubble .meta { display:block; margin-top: 7px; font-size: 11px; color: var(--faint); font-family: var(--mono); }
+
+  .gate {
+    margin-bottom: 16px;
+    padding: 16px 18px;
+    border-radius: 8px;
+    border: 1px solid var(--stroke);
+    background: var(--surface);
+    box-shadow: var(--shadow-soft);
+    display: none;
+    gap: 14px;
+    align-items: flex-start;
+  }
+
+  .gate.show { display: flex; }
+  .gate.err { border-color: #efc0bd; background: var(--err-soft); }
+  .gate.warn { border-color: #ead18a; background: var(--warn-soft); }
+  .gate .gi { flex: none; margin-top: 1px; }
+  .gate h3 { margin: 0 0 4px; font-size: 14.5px; }
+  .gate p { margin: 0; font-size: 13px; color: var(--muted); }
+
+  .gate code {
+    font-family: var(--mono);
+    font-size: 12px;
+    background: rgba(255, 255, 255, 0.65);
+    padding: 2px 6px;
+    border-radius: 5px;
+    color: var(--accent-dark);
+  }
+
+  input[type=range]:hover::-webkit-slider-thumb { transform: scale(1.18); }
+
+  a:focus-visible, button:focus-visible, textarea:focus-visible, input:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  .hint { font-size: 11.5px; color: var(--faint); margin-top: 8px; }
+
+  .footer {
+    text-align: center;
+    margin-top: 14px;
+    color: var(--faint);
+    font-size: 11.5px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; }
+  }
+
+  @media (max-width: 940px) {
+    body { height: auto; overflow: auto; }
+    .wrap { height: auto; min-height: 100vh; display: block; }
+    .grid { display: block; }
+    .grid > div:first-child { overflow: visible; }
+    .grid > div:last-child { display: block; margin-top: 14px; }
+    .thread { min-height: 260px; max-height: 60vh; }
+    .status-pill { margin-left: 0; }
+  }
+
+  @media (max-width: 560px) {
+    .wrap { padding: 14px 12px; }
+    header.top { align-items: flex-start; }
+    .status-pill { width: 100%; justify-content: center; }
+    .sliders { grid-template-columns: 1fr; gap: 12px; }
+    .composer-actions { flex-wrap: wrap; }
+    .composer-hint { flex-basis: 100%; white-space: normal; }
+    .bubble { max-width: calc(100% - 42px); }
+    .panel-body { padding: 14px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <div class="logo" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 2a4 4 0 0 1 4 4v1a4 4 0 0 1 0 8v1a4 4 0 0 1-8 0v-1a4 4 0 0 1 0-8V6a4 4 0 0 1 4-4z"/>
+        <path d="M12 8v8M8 11h8"/>
+      </svg>
+    </div>
+    <div class="title-block">
+      <h1>Prompt API Demo</h1>
+    </div>
+    <div class="status-pill">
+      <span class="dot" id="statusDot"></span>
+      <span id="statusText">Checking…</span>
+    </div>
+  </header>
+
+  <!-- Setup gate (shown when API/model unavailable) -->
+  <div class="gate" id="gate">
+    <span class="gi" id="gateIcon"></span>
+    <div>
+      <h3 id="gateTitle"></h3>
+      <p id="gateBody"></p>
+    </div>
+  </div>
+
+  <div class="grid">
+
+    <!-- ============ LEFT: BEHIND THE SCENES ============ -->
+    <div>
+      <section class="panel">
+        <div class="panel-head">
+          <span class="ico">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          </span>
+          <h2>Behind the scenes</h2>
+        </div>
+        <div class="panel-body">
+          <div class="kv">
+            <div class="kv-row"><span class="k"><code>LanguageModel</code> in window</span><span class="v" id="apiPresent">—</span></div>
+            <div class="kv-row"><span class="k">Availability</span><span id="availBadge"><span class="badge gray">checking…</span></span></div>
+            <div class="kv-row"><span class="k">Session</span><span id="sessBadge"><span class="badge gray">none</span></span></div>
+          </div>
+
+          <!-- Download progress -->
+          <div class="download-card" id="dlCard">
+            <div class="dl-top">
+              <b id="dlTitle">Downloading Phi-4-mini…</b>
+              <span class="dl-pct" id="dlPct">0%</span>
+            </div>
+            <div class="bar" id="dlBar"><span id="dlFill"></span></div>
+            <div class="dl-sub" id="dlSub">Initializing…</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <span class="ico">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+          </span>
+          <h2>Activity log</h2>
+        </div>
+        <div class="panel-body">
+          <div class="log" id="log"></div>
+          <div class="hint">Every API call, download event, and timing is traced here.</div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <span class="ico">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>
+          </span>
+          <h2>Session settings</h2>
+        </div>
+        <div class="panel-body">
+          <div class="field">
+            <label for="sysPrompt">System prompt</label>
+            <textarea id="sysPrompt" rows="2">You are a concise, friendly assistant running entirely on the user's device.</textarea>
+          </div>
+
+          <div class="field">
+            <div class="sliders">
+              <div>
+                <div class="slider-head"><span>Temperature</span><span class="val" id="tempVal">1.0</span></div>
+                <input type="range" id="temp" min="0" max="2" step="0.05" value="1" />
+              </div>
+              <div>
+                <div class="slider-head"><span>Top-K</span><span class="val" id="topkVal">3</span></div>
+                <input type="range" id="topk" min="1" max="8" step="1" value="3" />
+              </div>
+            </div>
+            <div class="hint">Changing any of these starts a fresh session with the new settings.</div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- ============ RIGHT: PLAYGROUND ============ -->
+    <div>
+      <section class="panel conversation">
+        <div class="panel-head">
+          <span class="ico">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          </span>
+          <h2>Conversation</h2>
+          <div class="spacer" style="flex:1"></div>
+          <button class="btn btn-ghost btn-sm" id="resetBtn" title="Destroy the session and clear the conversation">Reset session</button>
+        </div>
+        <div class="panel-body">
+          <div class="thread" id="thread">
+            <div class="empty-state" id="emptyState">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2a4 4 0 0 1 4 4v1a4 4 0 0 1 0 8v1a4 4 0 0 1-8 0v-1a4 4 0 0 1 0-8V6a4 4 0 0 1 4-4z"/></svg>
+              <div>Your conversation with the on-device model will appear here.<br/>Write a message below to get started.</div>
+            </div>
+          </div>
+
+          <div class="composer">
+            <textarea id="userPrompt" rows="2" placeholder="Ask the on-device model anything…   (Ctrl/⌘ + Enter to send)">Write a haiku about running AI locally in a web browser.</textarea>
+            <div class="composer-actions">
+              <span class="composer-hint" id="composerHint">Streams on-device via <code>promptStreaming()</code></span>
+              <div class="spacer"></div>
+              <button class="btn btn-danger" id="stopBtn" style="display:none">Stop</button>
+              <button class="btn btn-primary" id="sendBtn" disabled>
+                <svg class="send-ico" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                <span id="sendLabel">Send</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <div class="footer">
+    100% on-device · no data leaves your machine · powered by the experimental
+    <a href="https://learn.microsoft.com/en-us/microsoft-edge/web-platform/prompt-api" target="_blank" rel="noopener">Prompt API</a>
+    in Microsoft Edge
+  </div>
+</div>
+
+<script>
+(() => {
+  "use strict";
+
+  // ---------- element refs ----------
+  const $ = (id) => document.getElementById(id);
+  const el = {
+    statusDot: $("statusDot"), statusText: $("statusText"),
+    gate: $("gate"), gateIcon: $("gateIcon"), gateTitle: $("gateTitle"), gateBody: $("gateBody"),
+    apiPresent: $("apiPresent"), availBadge: $("availBadge"), sessBadge: $("sessBadge"),
+    dlCard: $("dlCard"), dlTitle: $("dlTitle"), dlPct: $("dlPct"), dlBar: $("dlBar"), dlFill: $("dlFill"), dlSub: $("dlSub"),
+    log: $("log"),
+    thread: $("thread"), emptyState: $("emptyState"),
+    sysPrompt: $("sysPrompt"),
+    temp: $("temp"), tempVal: $("tempVal"), topk: $("topk"), topkVal: $("topkVal"),
+    userPrompt: $("userPrompt"),
+    sendBtn: $("sendBtn"), sendLabel: $("sendLabel"), stopBtn: $("stopBtn"), resetBtn: $("resetBtn"),
+  };
+
+  // ---------- state ----------
+  let session = null;
+  let params = null;
+  let availability = "unknown";
+  let generating = false;
+  let abortCtrl = null;
+  let sessionConfig = { temp: 1, topk: 3, sys: "" };
+
+  // ---------- logging ----------
+  function pad(n){ return n < 10 ? "0"+n : ""+n; }
+  function now(){ const d = new Date(); return pad(d.getHours())+":"+pad(d.getMinutes())+":"+pad(d.getSeconds()); }
+  function log(msg, kind="info"){
+    const line = document.createElement("div");
+    line.className = "log-line " + kind;
+    line.innerHTML = `<span class="ts">${now()}</span><span class="msg">${msg}</span>`;
+    el.log.appendChild(line);
+    el.log.scrollTop = el.log.scrollHeight;
+  }
+
+  // ---------- status helpers ----------
+  function setStatus(text, dotClass){
+    el.statusText.textContent = text;
+    el.statusDot.className = "dot" + (dotClass ? " " + dotClass : "");
+  }
+  function setAvail(text, cls){
+    el.availBadge.innerHTML = `<span class="badge ${cls}">${text}</span>`;
+  }
+  function setSess(text, cls){
+    el.sessBadge.innerHTML = `<span class="badge ${cls}">${text}</span>`;
+  }
+  function showGate(kind, title, bodyHTML){
+    el.gate.className = "gate show " + kind;
+    const icons = {
+      err:  `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#e23d5b" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`,
+      warn: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#c98a00" stroke-width="2"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`,
+    };
+    el.gateIcon.innerHTML = icons[kind] || icons.warn;
+    el.gateTitle.textContent = title;
+    el.gateBody.innerHTML = bodyHTML;
+  }
+  function hideGate(){ el.gate.className = "gate"; }
+
+  // ---------- UI scaffolding ----------
+  el.temp.addEventListener("input", () => { el.tempVal.textContent = (+el.temp.value).toFixed(2); });
+  el.topk.addEventListener("input", () => { el.topkVal.textContent = el.topk.value; });
+
+  // ---------- download progress UI ----------
+  function showDownload(indeterminate){
+    el.dlCard.classList.add("show");
+    el.dlBar.classList.toggle("indeterminate", !!indeterminate);
+    if (indeterminate) { el.dlPct.textContent = ""; el.dlSub.textContent = "Contacting Edge model service…"; }
+  }
+  function setDownload(loaded, total){
+    el.dlBar.classList.remove("indeterminate");
+    const pct = total ? Math.min(100, Math.round((loaded / total) * 100)) : 0;
+    el.dlFill.style.width = pct + "%";
+    el.dlPct.textContent = pct + "%";
+    const mb = (b) => (b / (1024*1024)).toFixed(1);
+    if (total > 1) el.dlSub.textContent = `${mb(loaded)} MB / ${mb(total)} MB`;
+    else el.dlSub.textContent = `${pct}% complete`;
+  }
+  function finishDownload(){
+    el.dlFill.style.width = "100%";
+    el.dlPct.textContent = "100%";
+    el.dlTitle.textContent = "Model ready";
+    el.dlSub.textContent = "Phi-4-mini loaded into memory.";
+    setTimeout(() => el.dlCard.classList.remove("show"), 2200);
+  }
+
+  // ---------- thread rendering ----------
+  function clearEmpty(){ if (el.emptyState) { el.emptyState.remove(); el.emptyState = null; } }
+  function addMessage(role){
+    clearEmpty();
+    const row = document.createElement("div");
+    row.className = "msg-row " + (role === "user" ? "user" : "ai");
+    const av = document.createElement("div");
+    av.className = "avatar " + (role === "user" ? "me" : "ai");
+    av.textContent = role === "user" ? "You" : "AI";
+    av.style.fontSize = "10px";
+    const bubble = document.createElement("div");
+    bubble.className = "bubble " + (role === "user" ? "me" : "ai");
+    row.appendChild(av); row.appendChild(bubble);
+    el.thread.appendChild(row);
+    el.thread.scrollTop = el.thread.scrollHeight;
+    return bubble;
+  }
+
+  // ---------- core: ensure a session exists ----------
+  async function ensureSession(){
+    const wantTemp = +el.temp.value;
+    const wantTopk = +el.topk.value;
+    const wantSys  = el.sysPrompt.value.trim();
+
+    const changed = !session ||
+      sessionConfig.temp !== wantTemp ||
+      sessionConfig.topk !== wantTopk ||
+      sessionConfig.sys  !== wantSys;
+
+    if (!changed) return session;
+
+    if (session) { session.destroy(); log("Previous session destroyed (settings changed).", "warn"); }
+
+    const opts = {
+      temperature: wantTemp,
+      topK: wantTopk,
+      monitor(m){
+        m.addEventListener("downloadprogress", (e) => {
+          if (e.loaded < e.total) {
+            showDownload(false);
+            setDownload(e.loaded, e.total);
+            log(`downloadprogress → ${(e.loaded/e.total*100).toFixed(1)}%`, "evt");
+          } else {
+            setDownload(e.total, e.total);
+            log("downloadprogress → 100% (complete)", "ok");
+            finishDownload();
+          }
+        });
+      },
+    };
+    if (wantSys) opts.initialPrompts = [{ role: "system", content: wantSys }];
+
+    log(`LanguageModel.create({ temperature: ${wantTemp}, topK: ${wantTopk}${wantSys ? ", initialPrompts:[system]" : ""} })`, "sys");
+    if (availability === "downloadable" || availability === "downloading") {
+      showDownload(true);
+      el.dlTitle.textContent = "Downloading Phi-4-mini…";
+      setStatus("Downloading model…", "busy");
+    }
+    setSess("creating…", "blue");
+
+    const t0 = performance.now();
+    session = await LanguageModel.create(opts);
+    const dt = Math.round(performance.now() - t0);
+
+    sessionConfig = { temp: wantTemp, topk: wantTopk, sys: wantSys };
+    setSess("active", "green");
+    setStatus("Model ready", "live");
+    log(`Session created in ${dt} ms. inputQuota = ${(session.inputQuota||0).toLocaleString()} tokens.`, "ok");
+    return session;
+  }
+
+  // ---------- core: send a prompt ----------
+  async function send(){
+    const text = el.userPrompt.value.trim();
+    if (!text || generating) return;
+
+    generating = true;
+    el.sendBtn.disabled = true;
+    el.sendLabel.textContent = "Generating…";
+    el.stopBtn.style.display = "inline-block";
+    el.resetBtn.disabled = true;
+
+    addMessage("user").textContent = text;
+    el.userPrompt.value = "";
+    const bubble = addMessage("ai");
+    bubble.innerHTML = '<span class="cursor"></span>';
+
+    abortCtrl = new AbortController();
+
+    try {
+      await ensureSession();
+      log(`session.promptStreaming(${JSON.stringify(text.slice(0,48) + (text.length>48?"…":""))})`, "sys");
+
+      const t0 = performance.now();
+      const stream = session.promptStreaming(text, { signal: abortCtrl.signal });
+
+      let full = "";
+      let firstTokenAt = null;
+      let chunks = 0;
+      for await (const chunk of stream) {
+        if (firstTokenAt === null) {
+          firstTokenAt = Math.round(performance.now() - t0);
+          log(`First token after ${firstTokenAt} ms.`, "evt");
+        }
+        full += chunk;
+        chunks++;
+        bubble.innerHTML = escapeHTML(full) + '<span class="cursor"></span>';
+        el.thread.scrollTop = el.thread.scrollHeight;
+      }
+
+      const total = Math.round(performance.now() - t0);
+      bubble.innerHTML = escapeHTML(full);
+      const meta = document.createElement("span");
+      meta.className = "meta";
+      const approxTokens = Math.max(1, Math.round(full.length / 4));
+      const tps = total > 0 ? (approxTokens / (total/1000)).toFixed(1) : "—";
+      meta.textContent = `${chunks} chunks · ${total} ms · ~${tps} tok/s`;
+      bubble.appendChild(meta);
+      log(`Response complete: ${chunks} chunks in ${total} ms (~${tps} tok/s).`, "ok");
+    } catch (err) {
+      if (err && err.name === "AbortError") {
+        bubble.innerHTML = escapeHTML(bubble.textContent) +
+          '<span class="meta">⏹ stopped by user</span>';
+        log("Generation aborted via AbortController.", "warn");
+      } else {
+        bubble.innerHTML = `<span style="color:var(--err)">⚠ ${escapeHTML(err.message || String(err))}</span>`;
+        log("Error: " + (err.message || err), "err");
+      }
+    } finally {
+      generating = false;
+      abortCtrl = null;
+      el.sendBtn.disabled = false;
+      el.sendLabel.textContent = "Send";
+      el.stopBtn.style.display = "none";
+      el.resetBtn.disabled = false;
+      // suggest a fresh random prompt for the next turn
+      el.userPrompt.value = randomMessage();
+    }
+  }
+
+  // Pool of suggestion prompts; refilled into the input after each send.
+  const MESSAGE_POOL = [
+    "Write a haiku about running AI locally in a web browser.",
+    "Explain what an on-device language model is, in two sentences.",
+    "Give me three creative names for a privacy-first note-taking app.",
+    "Summarize the benefits of local inference vs. cloud AI as a bullet list.",
+    "Translate 'The model runs entirely on my laptop' into French and Japanese.",
+    "Suggest a fun team name for a hackathon about edge AI.",
+    "Write a one-line tagline for an offline-first chat app.",
+    "List five everyday tasks a small on-device model is great at.",
+    "Turn 'be kind' into an inspiring two-line poem.",
+    "Draft a friendly out-of-office reply for a week-long vacation.",
+    "Explain WebGPU to a curious 10-year-old in three sentences.",
+    "Give me a quick brainstorm of icebreaker questions for a meetup.",
+    "Compose a short motivational note for someone learning to code.",
+    "What are three pros and cons of streaming model responses token-by-token?",
+    "Invent a whimsical name for a robot that only works without internet.",
+  ];
+  let lastMessage = "";
+  function randomMessage(){
+    let pick;
+    do { pick = MESSAGE_POOL[Math.floor(Math.random() * MESSAGE_POOL.length)]; }
+    while (MESSAGE_POOL.length > 1 && pick === lastMessage);
+    lastMessage = pick;
+    return pick;
+  }
+
+  function escapeHTML(s){
+    return s.replace(/[&<>]/g, (c) => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;" }[c]));
+  }
+
+  // ---------- reset ----------
+  function reset(){
+    if (generating && abortCtrl) abortCtrl.abort();
+    if (session) { session.destroy(); log("Session destroyed via reset.", "warn"); }
+    session = null;
+    sessionConfig = { temp: -1, topk: -1, sys: " " };
+    setSess("none", "gray");
+    el.thread.innerHTML = "";
+    const es = document.createElement("div");
+    es.className = "empty-state";
+    es.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2a4 4 0 0 1 4 4v1a4 4 0 0 1 0 8v1a4 4 0 0 1-8 0v-1a4 4 0 0 1 0-8V6a4 4 0 0 1 4-4z"/></svg><div>Session cleared. Send a prompt to start fresh.</div>';
+    el.thread.appendChild(es);
+    el.emptyState = es;
+  }
+
+  // ---------- wiring ----------
+  el.sendBtn.addEventListener("click", send);
+  el.stopBtn.addEventListener("click", () => { if (abortCtrl) abortCtrl.abort(); });
+  el.resetBtn.addEventListener("click", reset);
+  el.userPrompt.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); send(); }
+  });
+
+  // ---------- boot: feature detection & availability ----------
+  async function boot(){
+    log("Demo loaded. Probing for the Prompt API…", "info");
+
+    if (!("LanguageModel" in self)) {
+      el.apiPresent.innerHTML = '<span class="badge red">false</span>';
+      setStatus("API unavailable", "err");
+      setAvail("unavailable", "red");
+      showGate("err", "The Prompt API isn't available in this browser",
+        `Use <b>Microsoft Edge Canary or Dev</b> (138.0.3309.2+), then open <code>edge://flags</code>, ` +
+        `search for <b>“Prompt API for on-device language model”</b>, set it to <b>Enabled</b>, and restart. ` +
+        `See the <a href="https://learn.microsoft.com/en-us/microsoft-edge/web-platform/prompt-api" target="_blank" rel="noopener">documentation</a>.`);
+      log("window.LanguageModel is undefined — API not enabled.", "err");
+      return;
+    }
+
+    el.apiPresent.innerHTML = '<span class="badge green">true</span>';
+    log("window.LanguageModel found ✓", "ok");
+
+    // read model params (sampling defaults / maxima)
+    try {
+      params = await LanguageModel.params();
+      // align controls with reported maxima
+      if (params.maxTemperature) el.temp.max = params.maxTemperature;
+      if (params.maxTopK) el.topk.max = Math.min(params.maxTopK, 40);
+      if (params.defaultTemperature != null) { el.temp.value = params.defaultTemperature; el.tempVal.textContent = (+params.defaultTemperature).toFixed(2); }
+      if (params.defaultTopK != null) { el.topk.value = params.defaultTopK; el.topkVal.textContent = params.defaultTopK; }
+      log(`LanguageModel.params() → defaultTemp ${params.defaultTemperature}, maxTemp ${params.maxTemperature}, defaultTopK ${params.defaultTopK}, maxTopK ${params.maxTopK}`, "evt");
+    } catch (e) {
+      log("LanguageModel.params() failed: " + (e.message || e), "warn");
+    }
+
+    // availability
+    availability = await LanguageModel.availability();
+    log(`LanguageModel.availability() → "${availability}"`, "evt");
+
+    if (availability === "unavailable") {
+      setStatus("Model unsupported", "err");
+      setAvail("unavailable", "red");
+      showGate("warn", "Your device can't run the model",
+        `The API is enabled, but <code>availability()</code> returned <b>"unavailable"</b>. ` +
+        `Phi-4-mini needs ~5.5&nbsp;GB VRAM, 20&nbsp;GB free disk, and a <b>High</b> device performance class. ` +
+        `Check <code>edge://on-device-internals</code>. On lower-end devices, try the prerelease Aion-1.0-Instruct model instead.`);
+      return;
+    }
+
+    setAvail(availability, availability === "available" ? "green" : "amber");
+    el.sendBtn.disabled = false;
+
+    if (availability === "available") {
+      setStatus("Model ready", "live");
+      log("Model already downloaded and ready ✓", "ok");
+    } else {
+      // downloadable / downloading
+      setStatus("Model needs download", "warn");
+      showGate("warn", "First run: the model will download",
+        `<code>availability()</code> is <b>"${availability}"</b>. The first prompt triggers a one-time ` +
+        `download of Phi-4-mini (shared across all sites). Watch the progress bar on the left — ` +
+        `you can dismiss this and just hit <b>Send</b>.`);
+      log("Model is " + availability + " — download will start on first session.", "warn");
+    }
+  }
+
+  boot().catch((e) => {
+    setStatus("Init error", "err");
+    log("Boot error: " + (e.message || e), "err");
+  });
+})();
+</script>
+</body>
+</html>
